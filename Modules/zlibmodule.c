@@ -203,20 +203,46 @@ zlib.compress
         Binary data to be compressed.
     /
     level: int(c_default="Z_DEFAULT_COMPRESSION") = Z_DEFAULT_COMPRESSION
-        Compression level, in 0-9 or -1.
+        The compression level (an integer in the range 0-9 or -1; default is
+        currently equivalent to 6).  Higher compression levels are slower,
+        but produce smaller results.
+    method: int(c_default="DEFLATED") = DEFLATED
+        The compression algorithm.  If given, this must be DEFLATED.
+    wbits: int(c_default="MAX_WBITS") = MAX_WBITS
+        +9 to +15: The base-two logarithm of the window size.  Include a zlib
+            container.
+        -9 to -15: Generate a raw stream.
+        +25 to +31: Include a gzip container.
+    memLevel: int(c_default="DEF_MEM_LEVEL") = DEF_MEM_LEVEL
+        Controls the amount of memory used for internal compression state.
+        Valid values range from 1 to 9.  Higher values result in higher memory
+        usage, faster compression, and smaller output.
+    strategy: int(c_default="Z_DEFAULT_STRATEGY") = Z_DEFAULT_STRATEGY
+        Used to tune the compression algorithm.  Possible values are
+        Z_DEFAULT_STRATEGY, Z_FILTERED, and Z_HUFFMAN_ONLY.
+    zdict: Py_buffer = None
+        The predefined compression dictionary - a sequence of bytes
+        containing subsequences that are likely to occur in the input data.
 
 Returns a bytes object containing compressed data.
 [clinic start generated code]*/
 
 static PyObject *
-zlib_compress_impl(PyObject *module, Py_buffer *data, int level)
-/*[clinic end generated code: output=d80906d73f6294c8 input=638d54b6315dbed3]*/
+zlib_compress_impl(PyObject *module, Py_buffer *data, int level, int method,
+                   int wbits, int memLevel, int strategy, Py_buffer *zdict)
+/*[clinic end generated code: output=375dff1ddf5c79f3 input=ad0903b59b3e059a]*/
 {
     PyObject *RetVal = NULL;
     Byte *ibuf;
     Py_ssize_t ibuflen, obuflen = DEF_BUF_SIZE;
     int err, flush;
     z_stream zst;
+
+    if (zdict->buf != NULL && (size_t)zdict->len > UINT_MAX) {
+        PyErr_SetString(PyExc_OverflowError,
+                        "zdict length does not fit in an unsigned int");
+        goto error;
+    }
 
     ibuf = data->buf;
     ibuflen = data->len;
@@ -225,11 +251,28 @@ zlib_compress_impl(PyObject *module, Py_buffer *data, int level)
     zst.zalloc = PyZlib_Malloc;
     zst.zfree = PyZlib_Free;
     zst.next_in = ibuf;
-    err = deflateInit(&zst, level);
+    err = deflateInit2(&zst, level, method, wbits, memLevel, strategy);
 
     switch (err) {
     case Z_OK:
-        break;
+        if (zdict->buf == NULL) {
+            break;
+        } else {
+            err = deflateSetDictionary(&zst,
+                                       zdict->buf, (unsigned int)zdict->len);
+            switch (err) {
+            case Z_OK:
+                break;
+            case Z_STREAM_ERROR:
+                deflateEnd(&zst);
+                PyErr_SetString(PyExc_ValueError, "Invalid dictionary");
+                goto error;
+            default:
+                deflateEnd(&zst);
+                PyErr_SetString(PyExc_ValueError, "deflateSetDictionary()");
+                goto error;
+            }
+        }
     case Z_MEM_ERROR:
         PyErr_SetString(PyExc_MemoryError,
                         "Out of memory while compressing data");

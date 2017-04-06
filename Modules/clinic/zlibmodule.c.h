@@ -3,7 +3,9 @@ preserve
 [clinic start generated code]*/
 
 PyDoc_STRVAR(zlib_compress__doc__,
-"compress($module, data, /, level=Z_DEFAULT_COMPRESSION)\n"
+"compress($module, data, /, level=Z_DEFAULT_COMPRESSION,\n"
+"         method=DEFLATED, wbits=MAX_WBITS, memLevel=DEF_MEM_LEVEL,\n"
+"         strategy=Z_DEFAULT_STRATEGY, zdict=None)\n"
 "--\n"
 "\n"
 "Returns a bytes object containing compressed data.\n"
@@ -11,33 +13,62 @@ PyDoc_STRVAR(zlib_compress__doc__,
 "  data\n"
 "    Binary data to be compressed.\n"
 "  level\n"
-"    Compression level, in 0-9 or -1.");
+"    The compression level (an integer in the range 0-9 or -1; default is\n"
+"    currently equivalent to 6).  Higher compression levels are slower,\n"
+"    but produce smaller results.\n"
+"  method\n"
+"    The compression algorithm.  If given, this must be DEFLATED.\n"
+"  wbits\n"
+"    +9 to +15: The base-two logarithm of the window size.  Include a zlib\n"
+"        container.\n"
+"    -9 to -15: Generate a raw stream.\n"
+"    +25 to +31: Include a gzip container.\n"
+"  memLevel\n"
+"    Controls the amount of memory used for internal compression state.\n"
+"    Valid values range from 1 to 9.  Higher values result in higher memory\n"
+"    usage, faster compression, and smaller output.\n"
+"  strategy\n"
+"    Used to tune the compression algorithm.  Possible values are\n"
+"    Z_DEFAULT_STRATEGY, Z_FILTERED, and Z_HUFFMAN_ONLY.\n"
+"  zdict\n"
+"    The predefined compression dictionary - a sequence of bytes\n"
+"    containing subsequences that are likely to occur in the input data.");
 
 #define ZLIB_COMPRESS_METHODDEF    \
     {"compress", (PyCFunction)zlib_compress, METH_FASTCALL, zlib_compress__doc__},
 
 static PyObject *
-zlib_compress_impl(PyObject *module, Py_buffer *data, int level);
+zlib_compress_impl(PyObject *module, Py_buffer *data, int level, int method,
+                   int wbits, int memLevel, int strategy, Py_buffer *zdict);
 
 static PyObject *
 zlib_compress(PyObject *module, PyObject **args, Py_ssize_t nargs, PyObject *kwnames)
 {
     PyObject *return_value = NULL;
-    static const char * const _keywords[] = {"", "level", NULL};
-    static _PyArg_Parser _parser = {"y*|i:compress", _keywords, 0};
+    static const char * const _keywords[] = {"", "level", "method", "wbits", "memLevel", "strategy", "zdict", NULL};
+    static _PyArg_Parser _parser = {"y*|iiiiiy*:compress", _keywords, 0};
     Py_buffer data = {NULL, NULL};
     int level = Z_DEFAULT_COMPRESSION;
+    int method = DEFLATED;
+    int wbits = MAX_WBITS;
+    int memLevel = DEF_MEM_LEVEL;
+    int strategy = Z_DEFAULT_STRATEGY;
+    Py_buffer zdict = {NULL, NULL};
 
     if (!_PyArg_ParseStackAndKeywords(args, nargs, kwnames, &_parser,
-        &data, &level)) {
+        &data, &level, &method, &wbits, &memLevel, &strategy, &zdict)) {
         goto exit;
     }
-    return_value = zlib_compress_impl(module, &data, level);
+    return_value = zlib_compress_impl(module, &data, level, method, wbits, memLevel, strategy, &zdict);
 
 exit:
     /* Cleanup for data */
     if (data.obj) {
        PyBuffer_Release(&data);
+    }
+    /* Cleanup for zdict */
+    if (zdict.obj) {
+       PyBuffer_Release(&zdict);
     }
 
     return return_value;
@@ -483,4 +514,4 @@ exit:
 #ifndef ZLIB_COMPRESS_COPY_METHODDEF
     #define ZLIB_COMPRESS_COPY_METHODDEF
 #endif /* !defined(ZLIB_COMPRESS_COPY_METHODDEF) */
-/*[clinic end generated code: output=fa1b5f4a6208c342 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=2b8b6f2bc56612ec input=a9049054013a1b77]*/
